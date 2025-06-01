@@ -1,0 +1,12 @@
+[
+  {
+    "nombre": "Scooter X1",
+    "marca": "Dualtron",
+    "precio": 25000
+  },
+  {
+    "nombre": "Scooter Z3",
+    "marca": "Teverun",
+    "precio": 19999
+  }
+]
