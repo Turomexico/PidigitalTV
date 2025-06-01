@@ -671,6 +671,46 @@
             width: auto;
             min-width: 150px;
         }
+
+        /* Estilos para la tabla de logs */
+        #logsTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        #logsTable th, #logsTable td {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        #logsTable th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+
+        .log-entry {
+            font-size: 13px;
+        }
+
+        .log-info {
+            background-color: #e7f4ff;
+        }
+
+        .log-warning {
+            background-color: #fff3e0;
+        }
+
+        .log-error {
+            background-color: #ffebee;
+        }
+
+        .log-critical {
+            background-color: #fce4ec;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -703,6 +743,7 @@
             <div class="tab" onclick="switchTab('estadisticas')"><i class="fas fa-chart-line"></i> Estadísticas</div>
             <div class="tab" onclick="switchTab('mensual')"><i class="fas fa-calendar-alt"></i> Servicios por Mes</div>
             <div class="tab" onclick="switchTab('inventario')"><i class="fas fa-boxes"></i> Inventario</div>
+            <div class="tab" onclick="switchTab('logs')"><i class="fas fa-clipboard-check"></i> Registro de Actividades</div>
         </div>
         
         <!-- Pestaña de Nueva Reparación -->
@@ -1018,6 +1059,34 @@
             </div>
         </div>
         
+        <!-- Pestaña de Registro de Actividades -->
+        <div id="logs" class="tab-content">
+            <div class="form-group">
+                <input type="text" id="searchLogsInput" placeholder="Buscar por usuario, acción o fecha...">
+            </div>
+            
+            <div class="table-responsive">
+                <table id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Usuario</th>
+                            <th>Acción</th>
+                            <th>Detalles</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        <!-- Los logs se cargarán aquí -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="action-buttons" style="margin-top: 15px;">
+                <button onclick="exportLogsToCSV()" class="export-btn"><i class="fas fa-file-excel"></i> Exportar a CSV</button>
+                <button onclick="clearLogs()" class="delete-btn"><i class="fas fa-trash-alt"></i> Limpiar Registros</button>
+            </div>
+        </div>
+        
         <div class="copyright">
             <p><i class="far fa-copyright"></i> Todos Los Derechos Reservados &copy; R.R SCooters 2025 Por Arturo Tramontin</p>
         </div>
@@ -1192,6 +1261,7 @@
         let salesHistory = JSON.parse(localStorage.getItem('scooterSales')) || [];
         let inventory = JSON.parse(localStorage.getItem('scooterInventory')) || [];
         let inventoryMovements = JSON.parse(localStorage.getItem('inventoryMovements')) || [];
+        let activityLogs = JSON.parse(localStorage.getItem('activityLogs')) || [];
         let commissionRate = 10;
         let currentEditingId = null;
         let currentInventoryItemId = null;
@@ -1216,12 +1286,14 @@
         const searchNotesInput = document.getElementById('searchNotesInput');
         const searchInventoryInput = document.getElementById('searchInventoryInput');
         const searchMovementsInput = document.getElementById('searchMovementsInput');
+        const searchLogsInput = document.getElementById('searchLogsInput');
         const categoryFilter = document.getElementById('categoryFilter');
         const stockFilter = document.getElementById('stockFilter');
         const historyTableBody = document.getElementById('historyTableBody');
         const pendingRepairsDiv = document.getElementById('pendingRepairs');
         const inventoryTableBody = document.getElementById('inventoryTableBody');
         const movementsTableBody = document.getElementById('movementsTableBody');
+        const logsTableBody = document.getElementById('logsTableBody');
         const modal = document.getElementById('notesModal');
         const inventoryModal = document.getElementById('inventoryModal');
         const movementModal = document.getElementById('movementModal');
@@ -1236,6 +1308,103 @@
             'Ventas': '1234'
         };
         
+        // Función para registrar una actividad
+        function logActivity(action, details, level = 'info') {
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                user: currentUser,
+                action: action,
+                details: details,
+                level: level
+            };
+            
+            activityLogs.push(logEntry);
+            localStorage.setItem('activityLogs', JSON.stringify(activityLogs));
+            
+            // Si estamos en la pestaña de logs y el usuario es Arturo, actualizar la tabla
+            if (currentUser === 'Arturo' && document.getElementById('logs').classList.contains('active')) {
+                loadLogs();
+            }
+        }
+        
+        // Función para cargar los logs
+        function loadLogs() {
+            const searchTerm = searchLogsInput.value.toLowerCase();
+            
+            // Filtrar logs según el término de búsqueda
+            const filteredLogs = activityLogs.filter(log => 
+                log.user.toLowerCase().includes(searchTerm) ||
+                log.action.toLowerCase().includes(searchTerm) ||
+                log.details.toLowerCase().includes(searchTerm) ||
+                log.timestamp.toLowerCase().includes(searchTerm)
+            ).reverse(); // Mostrar los más recientes primero
+            
+            logsTableBody.innerHTML = '';
+            
+            if (filteredLogs.length === 0) {
+                logsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No se encontraron registros</td></tr>';
+                return;
+            }
+            
+            filteredLogs.forEach(log => {
+                const row = document.createElement('tr');
+                row.className = `log-entry log-${log.level}`;
+                
+                const dateCell = document.createElement('td');
+                dateCell.textContent = formatDateTime(log.timestamp);
+                
+                const userCell = document.createElement('td');
+                userCell.textContent = log.user;
+                
+                const actionCell = document.createElement('td');
+                actionCell.textContent = log.action;
+                
+                const detailsCell = document.createElement('td');
+                detailsCell.textContent = log.details;
+                
+                row.appendChild(dateCell);
+                row.appendChild(userCell);
+                row.appendChild(actionCell);
+                row.appendChild(detailsCell);
+                
+                logsTableBody.appendChild(row);
+            });
+        }
+        
+        // Función para exportar logs a CSV
+        function exportLogsToCSV() {
+            if (activityLogs.length === 0) {
+                alert('No hay registros para exportar');
+                return;
+            }
+            
+            let csv = 'Fecha/Hora,Usuario,Acción,Detalles,Nivel\n';
+            
+            activityLogs.forEach(log => {
+                csv += `"${formatDateTime(log.timestamp)}","${log.user}","${log.action}","${log.details.replace(/"/g, '""')}","${log.level}"\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `registro_actividades_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Función para limpiar logs
+        function clearLogs() {
+            if (confirm('¿Está seguro que desea borrar todos los registros de actividad? Esta acción no se puede deshacer.')) {
+                activityLogs = [];
+                localStorage.setItem('activityLogs', JSON.stringify(activityLogs));
+                loadLogs();
+                logActivity('LIMPIEZA DE LOGS', 'Todos los registros de actividad fueron eliminados', 'critical');
+            }
+        }
+        
         // Función para verificar el login
         function checkLogin() {
             const username = document.getElementById('username').value;
@@ -1244,6 +1413,7 @@
             
             if (validUsers[username] && validUsers[username] === password) {
                 currentUser = username;
+                logActivity('INICIO DE SESIÓN', `Usuario ${username} inició sesión`, 'info');
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('mainContainer').style.display = 'block';
                 
@@ -1260,6 +1430,7 @@
                 // Aplicar restricciones según el tipo de usuario
                 applyUserRestrictions();
             } else {
+                logActivity('INTENTO DE INICIO DE SESIÓN FALLIDO', `Intento fallido con usuario: ${username}`, 'warning');
                 errorElement.textContent = 'Usuario o contraseña incorrectos';
             }
         }
@@ -1305,8 +1476,14 @@
                     btn.classList.add('restricted-action');
                 });
                 
+                // Ocultar pestaña de logs
+                document.querySelector('.tab[onclick="switchTab(\'logs\')"]').style.display = 'none';
+                
                 // Cambiar texto para indicar modo de solo lectura
                 document.querySelector('h1').textContent += ' (Modo Ventas)';
+            } else if (currentUser === 'Arturo') {
+                // Mostrar pestaña de logs para administrador
+                document.querySelector('.tab[onclick="switchTab(\'logs\')"]').style.display = 'flex';
             }
         }
         
@@ -1358,6 +1535,9 @@
             // Agregar al Historial
             salesHistory.push(saleRecord);
             saveToLocalStorage();
+            
+            // Registrar actividad
+            logActivity('NUEVA REPARACIÓN', `Cliente: ${customerName}, Modelo: ${model}, Costo: $${price.toFixed(2)}`, 'info');
             
             // Actualizar la interfaz
             loadSalesHistory();
@@ -2333,11 +2513,29 @@
                 return;
             }
             
+            const oldPrice = salesHistory[itemIndex].price;
+            const oldStatus = salesHistory[itemIndex].status;
+            const newStatus = document.getElementById('modalStatus').value;
+            const newNotes = document.getElementById('modalNotes').value;
+            
             salesHistory[itemIndex].price = newPrice;
             salesHistory[itemIndex].commission = newPrice * (salesHistory[itemIndex].commissionRate / 100);
-            salesHistory[itemIndex].status = document.getElementById('modalStatus').value;
-            salesHistory[itemIndex].notes = document.getElementById('modalNotes').value;
+            salesHistory[itemIndex].status = newStatus;
+            salesHistory[itemIndex].notes = newNotes;
             salesHistory[itemIndex].lastUpdated = new Date().toISOString();
+            
+            // Registrar actividad
+            let changes = [];
+            if (oldPrice !== newPrice) {
+                changes.push(`Precio modificado de $${oldPrice.toFixed(2)} a $${newPrice.toFixed(2)}`);
+            }
+            if (oldStatus !== newStatus) {
+                changes.push(`Estado cambiado de ${getStatusText(oldStatus)} a ${getStatusText(newStatus)}`);
+            }
+            
+            if (changes.length > 0) {
+                logActivity('ACTUALIZACIÓN DE REPARACIÓN', `ID: ${currentEditingId}. ${changes.join(', ')}`, 'info');
+            }
             
             saveToLocalStorage();
             loadSalesHistory();
@@ -2368,8 +2566,11 @@
                 const itemIndex = inventory.findIndex(item => item.id === currentInventoryItemId);
                 if (itemIndex === -1) return;
                 
+                const oldItem = inventory[itemIndex];
+                let changes = [];
+                
                 // Registrar movimiento de ajuste si cambió la cantidad
-                const oldQuantity = inventory[itemIndex].quantity;
+                const oldQuantity = oldItem.quantity;
                 if (quantity !== oldQuantity) {
                     const movement = {
                         id: Date.now(),
@@ -2385,10 +2586,25 @@
                     
                     inventoryMovements.push(movement);
                     saveInventoryMovementsToLocalStorage();
+                    
+                    changes.push(`Cantidad modificada de ${oldQuantity} a ${quantity}`);
+                }
+                
+                if (oldItem.name !== name) {
+                    changes.push(`Nombre cambiado de "${oldItem.name}" a "${name}"`);
+                }
+                if (oldItem.category !== category) {
+                    changes.push(`Categoría cambiada de "${getCategoryName(oldItem.category)}" a "${getCategoryName(category)}"`);
+                }
+                if (oldItem.price !== price) {
+                    changes.push(`Precio modificado de $${oldItem.price.toFixed(2)} a $${price.toFixed(2)}`);
+                }
+                if (oldItem.minStock !== minStock) {
+                    changes.push(`Stock mínimo modificado de ${oldItem.minStock} a ${minStock}`);
                 }
                 
                 inventory[itemIndex] = {
-                    ...inventory[itemIndex],
+                    ...oldItem,
                     name,
                     category,
                     quantity,
@@ -2397,6 +2613,11 @@
                     description,
                     minStock
                 };
+                
+                // Registrar actividad si hubo cambios
+                if (changes.length > 0) {
+                    logActivity('ACTUALIZACIÓN DE INVENTARIO', `Item ID: ${currentInventoryItemId}. ${changes.join(', ')}`, 'info');
+                }
             } else {
                 // Agregar nueva herramienta
                 const newItem = {
@@ -2427,6 +2648,9 @@
                 
                 inventoryMovements.push(movement);
                 saveInventoryMovementsToLocalStorage();
+                
+                // Registrar actividad
+                logActivity('NUEVO ITEM EN INVENTARIO', `Nombre: ${name}, Cantidad: ${quantity}, Categoría: ${getCategoryName(category)}`, 'info');
             }
             
             saveInventoryToLocalStorage();
@@ -2449,9 +2673,11 @@
             const itemIndex = inventory.findIndex(item => item.id === currentInventoryItemId);
             if (itemIndex === -1) return;
             
+            const item = inventory[itemIndex];
+            
             // Validar salida si no hay suficiente stock
-            if (type === 'salida' && quantity > inventory[itemIndex].quantity) {
-                alert(`No hay suficiente stock. Disponible: ${inventory[itemIndex].quantity}`);
+            if (type === 'salida' && quantity > item.quantity) {
+                alert(`No hay suficiente stock. Disponible: ${item.quantity}`);
                 return;
             }
             
@@ -2462,11 +2688,18 @@
             }
             
             // Actualizar cantidad en inventario
+            const oldQuantity = item.quantity;
+            let newQuantity;
+            
             if (type === 'entrada') {
-                inventory[itemIndex].quantity += quantity;
+                newQuantity = oldQuantity + quantity;
             } else if (type === 'salida') {
-                inventory[itemIndex].quantity -= quantity;
+                newQuantity = oldQuantity - quantity;
+            } else {
+                newQuantity = quantity; // Para ajustes
             }
+            
+            inventory[itemIndex].quantity = newQuantity;
             
             // Crear registro de movimiento
             const movement = {
@@ -2477,12 +2710,21 @@
                 date: new Date().toISOString(),
                 user: currentUser,
                 notes: type === 'salida' ? `Salida para: ${technician}. ${notes}` : notes,
-                newQuantity: inventory[itemIndex].quantity
+                newQuantity
             };
             
             inventoryMovements.push(movement);
             saveInventoryMovementsToLocalStorage();
             saveInventoryToLocalStorage();
+            
+            // Registrar actividad
+            const actionText = type === 'entrada' ? 'ENTRADA' : type === 'salida' ? 'SALIDA' : 'AJUSTE';
+            logActivity(
+                `${actionText} DE INVENTARIO`, 
+                `Item: ${item.name}, Cantidad: ${quantity}, Stock anterior: ${oldQuantity}, Nuevo stock: ${newQuantity}`,
+                'info'
+            );
+            
             loadInventory();
             closeMovementModal();
         }
@@ -2497,8 +2739,16 @@
             const itemIndex = salesHistory.findIndex(sale => sale.id === id);
             if (itemIndex === -1) return;
             
+            const oldStatus = salesHistory[itemIndex].status;
             salesHistory[itemIndex].status = 'completed';
             salesHistory[itemIndex].lastUpdated = new Date().toISOString();
+            
+            // Registrar actividad
+            logActivity(
+                'REPARACIÓN COMPLETADA', 
+                `ID: ${id}, Cliente: ${salesHistory[itemIndex].customerName}, Modelo: ${salesHistory[itemIndex].model}`,
+                'info'
+            );
             
             saveToLocalStorage();
             loadSalesHistory();
@@ -2516,8 +2766,21 @@
             }
             
             if (confirm('¿Está seguro que desea eliminar este registro permanentemente?')) {
+                const saleIndex = salesHistory.findIndex(sale => sale.id === id);
+                if (saleIndex === -1) return;
+                
+                const deletedSale = salesHistory[saleIndex];
+                
                 salesHistory = salesHistory.filter(sale => sale.id !== id);
                 saveToLocalStorage();
+                
+                // Registrar actividad
+                logActivity(
+                    'ELIMINACIÓN DE REPARACIÓN', 
+                    `ID: ${id}, Cliente: ${deletedSale.customerName}, Modelo: ${deletedSale.model}`,
+                    'warning'
+                );
+                
                 loadSalesHistory();
                 updateSummary();
                 loadPendingNotes();
@@ -2534,8 +2797,21 @@
             }
             
             if (confirm('¿Está seguro que desea eliminar esta herramienta del inventario? Todos los movimientos asociados permanecerán pero no se podrá identificar la herramienta.')) {
+                const itemIndex = inventory.findIndex(item => item.id === itemId);
+                if (itemIndex === -1) return;
+                
+                const deletedItem = inventory[itemIndex];
+                
                 inventory = inventory.filter(item => item.id !== itemId);
                 saveInventoryToLocalStorage();
+                
+                // Registrar actividad
+                logActivity(
+                    'ELIMINACIÓN DE ITEM DE INVENTARIO', 
+                    `Nombre: ${deletedItem.name}, Cantidad eliminada: ${deletedItem.quantity}`,
+                    'warning'
+                );
+                
                 loadInventory();
             }
         }
@@ -2567,6 +2843,9 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            // Registrar actividad
+            logActivity('EXPORTACIÓN DE DATOS', 'Exportación a CSV del historial de reparaciones', 'info');
         }
         
         // Función para exportar a PDF
@@ -2624,7 +2903,7 @@
             // Tabla de reparaciones
             doc.setFontSize(12);
             doc.setTextColor(40);
-            doc.text('Últimas Reparaciones Registradas', 105, 90, { align: 'center' });
+            doc.text('Últimas Reparaciones Registradas', 105, 95, { align: 'center' });
             
             const headers = [
                 ['Fecha', 'Cliente', 'Modelo', 'Costo', 'Estado']
@@ -2642,7 +2921,7 @@
                 ]);
             
             doc.autoTable({
-                startY: 95,
+                startY: 100,
                 head: headers,
                 body: data,
                 margin: { left: 14, right: 14 },
@@ -2687,6 +2966,9 @@
             
             // Guardar PDF
             doc.save(`resumen_reparaciones_${new Date().toISOString().slice(0,10)}.pdf`);
+            
+            // Registrar actividad
+            logActivity('EXPORTACIÓN DE DATOS', 'Exportación a PDF del historial de reparaciones', 'info');
         }
         
         // Función para actualizar el resumen
@@ -3101,6 +3383,15 @@
                 loadMonthlyServices();
             } else if (tabId === 'inventario') {
                 loadInventory();
+            } else if (tabId === 'logs') {
+                if (currentUser === 'Arturo') {
+                    loadLogs();
+                } else {
+                    alert('Solo el administrador puede acceder a los registros de actividad');
+                    // Volver a la pestaña anterior
+                    document.querySelector('.tab.active').click();
+                    return;
+                }
             }
         }
         
@@ -3126,6 +3417,7 @@
         searchNotesInput.addEventListener('input', loadPendingNotes);
         searchInventoryInput.addEventListener('input', loadInventory);
         searchMovementsInput.addEventListener('input', loadInventoryMovements);
+        searchLogsInput.addEventListener('input', loadLogs);
         categoryFilter.addEventListener('change', loadInventory);
         stockFilter.addEventListener('change', loadInventory);
         closeModal.addEventListener('click', () => modal.style.display = 'none');
